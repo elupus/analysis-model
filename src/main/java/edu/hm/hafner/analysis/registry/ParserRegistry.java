@@ -145,6 +145,7 @@ public class ParserRegistry {
             new TnsdlDescriptor(),
             new TrivyDescriptor(),
             new TsLintDescriptor(),
+            new ValgrindDescriptor(),
             new XlcDescriptor(),
             new YamlLintDescriptor(),
             new XmlLintDescriptor(),
