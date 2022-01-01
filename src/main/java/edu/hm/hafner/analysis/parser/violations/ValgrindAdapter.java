@@ -36,7 +36,6 @@ public class ValgrindAdapter extends AbstractViolationAdapter {
 
             for (Violation violation: violations) {
                 updateIssueBuilder(violation, issueBuilder);
-                issueBuilder.setOrigin("valgrind:" + violation.getReporter());
                 issueBuilder.setCategory("valgrind:" + violation.getReporter());
 
                 StringBuilder description = new StringBuilder();

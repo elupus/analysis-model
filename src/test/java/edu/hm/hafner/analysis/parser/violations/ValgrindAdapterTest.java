@@ -19,7 +19,6 @@ class ValgrindAdapterTest extends AbstractParserTest {
     protected void assertThatIssuesArePresent(final Report report, final SoftAssertions softly) {
         softly.assertThat(report).hasSize(3);
         softly.assertThat(report.get(1))
-                .hasOrigin("valgrind:memcheck")
                 .hasCategory("valgrind:memcheck")
                 .hasMessage("Conditional jump or move depends on uninitialised value(s)")
                 .hasFileName("terrible_program.cpp")
@@ -27,7 +26,6 @@ class ValgrindAdapterTest extends AbstractParserTest {
                 .hasLineStart(5)
                 .hasSeverity(Severity.WARNING_HIGH);
         softly.assertThat(report.get(0))
-                .hasOrigin("valgrind:memcheck")
                 .hasCategory("valgrind:memcheck")
                 .hasMessage("Invalid write of size 4")
                 .hasFileName("terrible_program.cpp")
@@ -35,7 +33,6 @@ class ValgrindAdapterTest extends AbstractParserTest {
                 .hasLineStart(10)
                 .hasSeverity(Severity.WARNING_HIGH);
         softly.assertThat(report.get(2))
-                .hasOrigin("valgrind:memcheck")
                 .hasCategory("valgrind:memcheck")
                 .hasMessage("16 bytes in 1 blocks are definitely lost in loss record 1 of 1")
                 .hasFileName("terrible_program.cpp")
