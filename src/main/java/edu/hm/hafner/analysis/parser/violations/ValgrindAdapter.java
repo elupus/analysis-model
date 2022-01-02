@@ -3,6 +3,8 @@ package edu.hm.hafner.analysis.parser.violations;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.text.StringEscapeUtils;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -114,7 +116,7 @@ public class ValgrindAdapter extends AbstractViolationAdapter {
                     if (suppression != null && !suppression.isEmpty()) {
                         description
                                 .append("<h2>Suppression</h2><table><tr><td class=\"pane\"><pre>")
-                                .append(suppression)
+                                .append(StringEscapeUtils.escapeHtml4(suppression))
                                 .append("</pre></td></tr></table>");
                     }
                 }
