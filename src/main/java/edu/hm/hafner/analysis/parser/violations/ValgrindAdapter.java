@@ -23,6 +23,7 @@ import se.bjurr.violations.lib.parsers.ValgrindParser;
  */
 public class ValgrindAdapter extends AbstractViolationAdapter {
     private static final long serialVersionUID = -6117336551972081612L;
+    private static final int numberedStackThreshold = 2;
 
     @Override
     ValgrindParser createParser() {
@@ -37,95 +38,105 @@ public class ValgrindAdapter extends AbstractViolationAdapter {
             for (Violation violation: violations) {
                 updateIssueBuilder(violation, issueBuilder);
                 issueBuilder.setCategory("valgrind:" + violation.getReporter());
-
-                final StringBuilder description = new StringBuilder(512);
-
-                description.append("<table>");
-
-                maybeAppendTableRow(description, "Executable", violation.getSource());
-                maybeAppendTableRow(description, "Unique Id", violation.getGroup());
-
-                final Map<String, String> specifics = violation.getSpecifics();
-                JSONArray auxWhats = null;
-
-                if (specifics != null && !specifics.isEmpty()) {
-                    maybeAppendTableRow(description, "Thread Id", specifics.get("tid"));
-                    maybeAppendTableRow(description, "Thread Name", specifics.get("threadname"));
-
-                    final String auxWhatsJson = specifics.get("auxwhats");
-
-                    if (auxWhatsJson != null && !auxWhatsJson.isEmpty()) {
-                        final JSONTokener json = new JSONTokener(auxWhatsJson);
-                        auxWhats = new JSONArray(json);
-
-                        for (int auxwhatIndex = 0; auxwhatIndex < auxWhats.length(); ++auxwhatIndex) {
-                            maybeAppendTableRow(description, "Auxiliary", auxWhats.getString(auxwhatIndex));
-                        }
-                    }
-                }
-
-                description.append("</table>");
-
-                if (specifics != null && !specifics.isEmpty()) {
-                    final JSONTokener json = new JSONTokener(specifics.get("stacks"));
-                    final JSONArray stacks = new JSONArray(json);
-
-                    for (int stackIndex = 0; stackIndex < stacks.length(); ++stackIndex) {
-                        description.append("<h2>");
-                        if (stackIndex == 0) {
-                            description.append("Primary Stack Trace</h2><h3>")
-                                       .append(violation.getMessage())
-                                       .append("</h3>");
-                        }
-                        else {
-                            description.append("Auxiliary Stack Trace");
-
-                            if (stacks.length() > 2) {
-                                description.append(" #").append(stackIndex);
-                            }
-
-                            description.append("</h2>");
-
-                            if (auxWhats != null && auxWhats.length() >= stackIndex) {
-                                description
-                                        .append("<h3>")
-                                        .append(auxWhats.getString(stackIndex - 1))
-                                        .append("</h3>");
-                            }
-                        }
-
-                        final JSONArray frames = stacks.getJSONArray(stackIndex);
-
-                        for (int frameIndex = 0; frameIndex < frames.length(); ++frameIndex) {
-                            final JSONObject frame = frames.getJSONObject(frameIndex);
-
-                            if (frameIndex > 0) {
-                                description.append("<br>");
-                            }
-
-                            description.append("<table>");
-                            maybeAppendTableRow(description, "Object", frame.getString("obj"));
-                            maybeAppendTableRow(description, "Function", frame.getString("fn"));
-                            maybeAppendStackFrameFileTableRow(description, frame);
-                            description.append("</table>");
-                        }
-                    }
-
-                    final String suppression = specifics.get("suppression");
-
-                    if (suppression != null && !suppression.isEmpty()) {
-                        description
-                                .append("<h2>Suppression</h2><table><tr><td class=\"pane\"><pre>")
-                                .append(StringEscapeUtils.escapeHtml4(suppression))
-                                .append("</pre></td></tr></table>");
-                    }
-                }
-
-                issueBuilder.setDescription(description.toString());
+                issueBuilder.setDescription(generateDescriptionHtml(violation));
                 report.add(issueBuilder.buildAndClean());
             }
 
             return report;
+        }
+    }
+
+    private String generateDescriptionHtml(final Violation violation) {
+        final StringBuilder description = new StringBuilder(512);
+
+        final Map<String, String> specifics = violation.getSpecifics();
+        final JSONArray auxWhats = getAuxWhatsArray(specifics);
+
+        appendGeneralTable(description, violation.getSource(), violation.getGroup(), specifics.get("tid"), specifics.get("threadname"), auxWhats);
+        maybeAppendStackTraces(description, specifics.get("stacks"), violation.getMessage(), auxWhats);
+        maybeAppendSuppression(description, specifics.get("suppression"));
+
+        return description.toString();
+    }
+
+    private void appendGeneralTable(final StringBuilder html, final String executable, final String uniqueId, final String threadId, final String threadName, final JSONArray auxWhats) {
+        html.append("<table>");
+
+        maybeAppendTableRow(html, "Executable", executable);
+        maybeAppendTableRow(html, "Unique Id", uniqueId);
+        maybeAppendTableRow(html, "Thread Id", threadId);
+        maybeAppendTableRow(html, "Thread Name", threadName);
+
+        if (auxWhats != null && !auxWhats.isEmpty()) {
+            for (int auxwhatIndex = 0; auxwhatIndex < auxWhats.length(); ++auxwhatIndex) {
+                maybeAppendTableRow(html, "Auxiliary", auxWhats.getString(auxwhatIndex));
+            }
+        }
+
+        html.append("</table>");
+    }
+
+    private void maybeAppendStackTraces(final StringBuilder html, final String stacksJson, final String message, final JSONArray auxWhats) {
+        final JSONArray stacks = new JSONArray(new JSONTokener(stacksJson));
+
+        if (!stacks.isEmpty()) {
+            appendStackTrace(html, "Primary Stack Trace", message, stacks.getJSONArray(0));
+
+            for (int stackIndex = 1; stackIndex < stacks.length(); ++stackIndex) {
+                String msg = null;
+                if (auxWhats != null && auxWhats.length() >= stackIndex) {
+                    msg = auxWhats.getString(stackIndex - 1);
+                }
+
+                String title = "Auxiliary Stack Trace";
+
+                if (stacks.length() > numberedStackThreshold) {
+                    title = "Auxiliary Stack Trace #" + Integer.toString(stackIndex);
+                }
+
+                appendStackTrace(html, title, msg, stacks.getJSONArray(stackIndex));
+            }
+        }
+    }
+
+    private void appendStackTrace(final StringBuilder html, final String title, final String message, final JSONArray frames) {
+        html
+                .append("<h2>")
+                .append(title)
+                .append("</h2>");
+
+        if (message != null && !message.isEmpty()) {
+            html
+                    .append("<h3>")
+                    .append(message)
+                    .append("</h3>");
+        }
+
+        for (int frameIndex = 0; frameIndex < frames.length(); ++frameIndex) {
+            final JSONObject frame = frames.getJSONObject(frameIndex);
+
+            if (frameIndex > 0) {
+                html.append("<br>");
+            }
+
+            appendStackFrame(html, frame);
+        }
+    }
+
+    private void appendStackFrame(final StringBuilder html, final JSONObject frame) {
+        html.append("<table>");
+        maybeAppendTableRow(html, "Object", frame.getString("obj"));
+        maybeAppendTableRow(html, "Function", frame.getString("fn"));
+        maybeAppendStackFrameFileTableRow(html, frame);
+        html.append("</table>");
+    }
+
+    private void maybeAppendSuppression(final StringBuilder html, final String suppression) {
+        if (suppression != null && !suppression.isEmpty()) {
+            html
+                    .append("<h2>Suppression</h2><table><tr><td class=\"pane\"><pre>")
+                    .append(StringEscapeUtils.escapeHtml4(suppression))
+                    .append("</pre></td></tr></table>");
         }
     }
 
@@ -160,5 +171,17 @@ public class ValgrindAdapter extends AbstractViolationAdapter {
 
             html.append("</td></tr>");
         }
+    }
+
+    private JSONArray getAuxWhatsArray(final Map<String, String> specifics) {
+        if (specifics != null && !specifics.isEmpty()) {
+            final String auxWhatsJson = specifics.get("auxwhats");
+
+            if (auxWhatsJson != null && !auxWhatsJson.isEmpty()) {
+                return new JSONArray(new JSONTokener(auxWhatsJson));
+            }
+        }
+
+        return null;
     }
 }
