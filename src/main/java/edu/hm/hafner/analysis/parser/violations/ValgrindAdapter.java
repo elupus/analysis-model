@@ -14,7 +14,6 @@ import edu.hm.hafner.analysis.IssueBuilder;
 import edu.hm.hafner.analysis.Report;
 
 import edu.umd.cs.findbugs.annotations.CheckForNull;
-import edu.umd.cs.findbugs.annotations.Nullable;
 
 import se.bjurr.violations.lib.model.Violation;
 import se.bjurr.violations.lib.parsers.ValgrindParser;
@@ -62,7 +61,7 @@ public class ValgrindAdapter extends AbstractViolationAdapter {
         return description.toString();
     }
 
-    private void appendGeneralTable(final StringBuilder html, final String executable, final String uniqueId, @Nullable final String threadId, @Nullable final String threadName, @Nullable final JSONArray auxWhats) {
+    private void appendGeneralTable(final StringBuilder html, final String executable, final String uniqueId, @CheckForNull final String threadId, @CheckForNull final String threadName, @CheckForNull final JSONArray auxWhats) {
         html.append("<table>");
 
         maybeAppendTableRow(html, "Executable", executable);
@@ -79,33 +78,35 @@ public class ValgrindAdapter extends AbstractViolationAdapter {
         html.append("</table>");
     }
 
-    private void maybeAppendStackTraces(final StringBuilder html, @Nullable final String stacksJson, final String message, @Nullable final JSONArray auxWhats) {
-        if (stacksJson != null && !stacksJson.isEmpty()) {
-            final JSONArray stacks = new JSONArray(new JSONTokener(stacksJson));
+    private void maybeAppendStackTraces(final StringBuilder html, @CheckForNull final String stacksJson, final String message, @CheckForNull final JSONArray auxWhats) {
+        if (stacksJson == null || stacksJson.isEmpty()) {
+            return;
+        }
 
-            if (!stacks.isEmpty()) {
-                appendStackTrace(html, "Primary Stack Trace", message, stacks.getJSONArray(0));
+        final JSONArray stacks = new JSONArray(new JSONTokener(stacksJson));
 
-                for (int stackIndex = 1; stackIndex < stacks.length(); ++stackIndex) {
-                    String msg = null;
+        if (!stacks.isEmpty()) {
+            appendStackTrace(html, "Primary Stack Trace", message, stacks.getJSONArray(0));
 
-                    if (auxWhats != null && auxWhats.length() >= stackIndex) {
-                        msg = auxWhats.getString(stackIndex - 1);
-                    }
+            for (int stackIndex = 1; stackIndex < stacks.length(); ++stackIndex) {
+                String msg = null;
 
-                    String title = "Auxiliary Stack Trace";
-
-                    if (stacks.length() > NUMBERED_STACK_THRESHOLD) {
-                        title = "Auxiliary Stack Trace #" + stackIndex;
-                    }
-
-                    appendStackTrace(html, title, msg, stacks.getJSONArray(stackIndex));
+                if (auxWhats != null && auxWhats.length() >= stackIndex) {
+                    msg = auxWhats.getString(stackIndex - 1);
                 }
+
+                String title = "Auxiliary Stack Trace";
+
+                if (stacks.length() > NUMBERED_STACK_THRESHOLD) {
+                    title = "Auxiliary Stack Trace #" + stackIndex;
+                }
+
+                appendStackTrace(html, title, msg, stacks.getJSONArray(stackIndex));
             }
         }
     }
 
-    private void appendStackTrace(final StringBuilder html, final String title, @Nullable final String message, final JSONArray frames) {
+    private void appendStackTrace(final StringBuilder html, final String title, @CheckForNull final String message, final JSONArray frames) {
         html
                 .append("<h2>")
                 .append(title)
@@ -137,7 +138,7 @@ public class ValgrindAdapter extends AbstractViolationAdapter {
         html.append("</table>");
     }
 
-    private void maybeAppendSuppression(final StringBuilder html, @Nullable final String suppression) {
+    private void maybeAppendSuppression(final StringBuilder html, @CheckForNull final String suppression) {
         if (suppression != null && !suppression.isEmpty()) {
             html
                     .append("<h2>Suppression</h2><table><tr><td class=\"pane\"><pre>")
@@ -146,7 +147,7 @@ public class ValgrindAdapter extends AbstractViolationAdapter {
         }
     }
 
-    private void maybeAppendTableRow(final StringBuilder html, final String name, @Nullable final String value) {
+    private void maybeAppendTableRow(final StringBuilder html, final String name, @CheckForNull final String value) {
         if (value != null && !value.isEmpty()) {
             html
                     .append("<tr><td class=\"pane-header\">")
