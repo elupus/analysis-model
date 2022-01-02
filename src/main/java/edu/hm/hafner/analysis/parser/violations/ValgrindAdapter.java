@@ -13,6 +13,9 @@ import org.json.JSONTokener;
 import edu.hm.hafner.analysis.IssueBuilder;
 import edu.hm.hafner.analysis.Report;
 
+import edu.umd.cs.findbugs.annotations.CheckForNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
+
 import se.bjurr.violations.lib.model.Violation;
 import se.bjurr.violations.lib.parsers.ValgrindParser;
 
@@ -23,7 +26,7 @@ import se.bjurr.violations.lib.parsers.ValgrindParser;
  */
 public class ValgrindAdapter extends AbstractViolationAdapter {
     private static final long serialVersionUID = -6117336551972081612L;
-    private static final int numberedStackThreshold = 2;
+    private static final int NUMBERED_STACK_THRESHOLD = 2;
 
     @Override
     ValgrindParser createParser() {
@@ -59,7 +62,7 @@ public class ValgrindAdapter extends AbstractViolationAdapter {
         return description.toString();
     }
 
-    private void appendGeneralTable(final StringBuilder html, final String executable, final String uniqueId, final String threadId, final String threadName, final JSONArray auxWhats) {
+    private void appendGeneralTable(final StringBuilder html, final String executable, final String uniqueId, @Nullable final String threadId, @Nullable final String threadName, @Nullable final JSONArray auxWhats) {
         html.append("<table>");
 
         maybeAppendTableRow(html, "Executable", executable);
@@ -76,30 +79,33 @@ public class ValgrindAdapter extends AbstractViolationAdapter {
         html.append("</table>");
     }
 
-    private void maybeAppendStackTraces(final StringBuilder html, final String stacksJson, final String message, final JSONArray auxWhats) {
-        final JSONArray stacks = new JSONArray(new JSONTokener(stacksJson));
+    private void maybeAppendStackTraces(final StringBuilder html, @Nullable final String stacksJson, final String message, @Nullable final JSONArray auxWhats) {
+        if (stacksJson != null && !stacksJson.isEmpty()) {
+            final JSONArray stacks = new JSONArray(new JSONTokener(stacksJson));
 
-        if (!stacks.isEmpty()) {
-            appendStackTrace(html, "Primary Stack Trace", message, stacks.getJSONArray(0));
+            if (!stacks.isEmpty()) {
+                appendStackTrace(html, "Primary Stack Trace", message, stacks.getJSONArray(0));
 
-            for (int stackIndex = 1; stackIndex < stacks.length(); ++stackIndex) {
-                String msg = null;
-                if (auxWhats != null && auxWhats.length() >= stackIndex) {
-                    msg = auxWhats.getString(stackIndex - 1);
+                for (int stackIndex = 1; stackIndex < stacks.length(); ++stackIndex) {
+                    String msg = null;
+
+                    if (auxWhats != null && auxWhats.length() >= stackIndex) {
+                        msg = auxWhats.getString(stackIndex - 1);
+                    }
+
+                    String title = "Auxiliary Stack Trace";
+
+                    if (stacks.length() > NUMBERED_STACK_THRESHOLD) {
+                        title = "Auxiliary Stack Trace #" + stackIndex;
+                    }
+
+                    appendStackTrace(html, title, msg, stacks.getJSONArray(stackIndex));
                 }
-
-                String title = "Auxiliary Stack Trace";
-
-                if (stacks.length() > numberedStackThreshold) {
-                    title = "Auxiliary Stack Trace #" + Integer.toString(stackIndex);
-                }
-
-                appendStackTrace(html, title, msg, stacks.getJSONArray(stackIndex));
             }
         }
     }
 
-    private void appendStackTrace(final StringBuilder html, final String title, final String message, final JSONArray frames) {
+    private void appendStackTrace(final StringBuilder html, final String title, @Nullable final String message, final JSONArray frames) {
         html
                 .append("<h2>")
                 .append(title)
@@ -131,7 +137,7 @@ public class ValgrindAdapter extends AbstractViolationAdapter {
         html.append("</table>");
     }
 
-    private void maybeAppendSuppression(final StringBuilder html, final String suppression) {
+    private void maybeAppendSuppression(final StringBuilder html, @Nullable final String suppression) {
         if (suppression != null && !suppression.isEmpty()) {
             html
                     .append("<h2>Suppression</h2><table><tr><td class=\"pane\"><pre>")
@@ -140,7 +146,7 @@ public class ValgrindAdapter extends AbstractViolationAdapter {
         }
     }
 
-    private void maybeAppendTableRow(final StringBuilder html, final String name, final String value) {
+    private void maybeAppendTableRow(final StringBuilder html, final String name, @Nullable final String value) {
         if (value != null && !value.isEmpty()) {
             html
                     .append("<tr><td class=\"pane-header\">")
@@ -173,13 +179,12 @@ public class ValgrindAdapter extends AbstractViolationAdapter {
         }
     }
 
+    @CheckForNull
     private JSONArray getAuxWhatsArray(final Map<String, String> specifics) {
-        if (specifics != null && !specifics.isEmpty()) {
-            final String auxWhatsJson = specifics.get("auxwhats");
+        final String auxWhatsJson = specifics.get("auxwhats");
 
-            if (auxWhatsJson != null && !auxWhatsJson.isEmpty()) {
-                return new JSONArray(new JSONTokener(auxWhatsJson));
-            }
+        if (auxWhatsJson != null && !auxWhatsJson.isEmpty()) {
+            return new JSONArray(new JSONTokener(auxWhatsJson));
         }
 
         return null;
